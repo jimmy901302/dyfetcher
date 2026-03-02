@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>抖音直播弹幕抓取</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei",
+          sans-serif;
+        background: #0f172a;
+        color: #e5e7eb;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+        padding: 24px;
+        transition: background 0.2s ease, color 0.2s ease;
+      }
+      .container {
+        width: 100%;
+        max-width: 960px;
+        background: rgba(15, 23, 42, 0.95);
+        border-radius: 16px;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        padding: 20px 24px 24px;
+        transition: background 0.2s ease, border-color 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+      .title {
+        font-size: 20px;
+        font-weight: 600;
+      }
+      .status {
+        font-size: 13px;
+        color: #9ca3af;
+      }
+      .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #f97316;
+        margin-right: 6px;
+      }
+      .control-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .input {
+        flex: 1;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #374151;
+        background: #020617;
+        color: #e5e7eb;
+        font-size: 14px;
+        outline: none;
+      }
+      .input:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.6);
+      }
+      .btn {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: none;
+        font-size: 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        white-space: nowrap;
+        transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.08s;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        color: white;
+        box-shadow: 0 10px 30px rgba(79, 70, 229, 0.4);
+      }
+      .btn-secondary {
+        background: #111827;
+        color: #e5e7eb;
+        border: 1px solid #374151;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: #9ca3af;
+        border: 1px solid #374151;
+      }
+      .btn:active {
+        transform: translateY(1px);
+        box-shadow: none;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      .hint {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-bottom: 8px;
+      }
+      .hint code {
+        padding: 2px 4px;
+        border-radius: 4px;
+        background: #111827;
+        color: #e5e7eb;
+      }
+      .danmu-box {
+        margin-top: 10px;
+        background: radial-gradient(circle at top, #020617 0, #020617 35%, #020617 100%);
+        border-radius: 12px;
+        border: 1px solid #1f2937;
+        padding: 10px 10px 6px;
+        height: 420px;
+        display: flex;
+        flex-direction: column;
+      }
+      .danmu-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+      .danmu-title {
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .danmu-counter {
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      .danmu-list {
+        flex: 1;
+        overflow-y: auto;
+        padding-right: 4px;
+        font-size: 13px;
+      }
+      .danmu-item {
+        padding: 4px 6px;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        background: rgba(15, 23, 42, 0.9);
+        display: grid;
+        grid-template-columns: 80px 70px 1fr;
+        gap: 6px;
+        align-items: baseline;
+      }
+      .danmu-time {
+        font-size: 11px;
+        color: #6b7280;
+        min-width: 70px;
+      }
+      .danmu-type {
+        font-size: 11px;
+        color: #38bdf8;
+        white-space: nowrap;
+      }
+      .danmu-user {
+        font-size: 12px;
+        color: #fbbf24;
+        white-space: nowrap;
+      }
+      .danmu-content {
+        font-size: 13px;
+        color: #e5e7eb;
+        word-break: break-all;
+      }
+      .footer {
+        margin-top: 10px;
+        font-size: 11px;
+        color: #6b7280;
+        text-align: right;
+      }
+
+      .disclaimer {
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 8px;
+        background: rgba(249, 115, 22, 0.1);
+        border: 1px solid rgba(249, 115, 22, 0.3);
+        font-size: 11px;
+        color: #f97316;
+        line-height: 1.6;
+      }
+      
+      body.light .disclaimer {
+        background: rgba(249, 115, 22, 0.05);
+        border-color: rgba(249, 115, 22, 0.2);
+        color: #ea580c;
+      }
+
+      .stats-row {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #9ca3af;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .stat-pill {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #020617;
+        border: 1px solid #1f2937;
+      }
+
+      .csv-box {
+        margin-top: 10px;
+        border-radius: 10px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .csv-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      .csv-textarea {
+        width: 100%;
+        height: 200px;
+        resize: vertical;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        font-size: 11px;
+        background: #020617;
+        color: #e5e7eb;
+        border-radius: 8px;
+        border: 1px solid #1f2937;
+        padding: 6px 8px;
+        outline: none;
+      }
+
+      /* 亮色模式覆盖 */
+      body.light {
+        background: #f3f4f6;
+        color: #111827;
+      }
+      body.light .container {
+        background: #ffffff;
+        border-color: #e5e7eb;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+      }
+      body.light .status {
+        color: #4b5563;
+      }
+      body.light .hint {
+        color: #6b7280;
+      }
+      body.light .hint code {
+        background: #f3f4f6;
+        color: #111827;
+      }
+      body.light .input {
+        background: #ffffff;
+        color: #111827;
+        border-color: #d1d5db;
+      }
+      body.light .input:focus {
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.5);
+      }
+      body.light .btn-secondary {
+        background: #f9fafb;
+        color: #111827;
+        border-color: #d1d5db;
+      }
+      body.light .btn-ghost {
+        border-color: #d1d5db;
+        color: #4b5563;
+      }
+      body.light .danmu-box {
+        background: #f9fafb;
+        border-color: #e5e7eb;
+      }
+      body.light .danmu-item {
+        background: #ffffff;
+      }
+      body.light .danmu-time {
+        color: #9ca3af;
+      }
+      body.light .danmu-type {
+        color: #0284c7;
+      }
+      body.light .danmu-user {
+        color: #b45309;
+      }
+      body.light .danmu-content {
+        color: #111827;
+      }
+      body.light .footer {
+        color: #9ca3af;
+      }
+      body.light .stat-pill {
+        background: #f3f4f6;
+        border-color: #e5e7eb;
+      }
+      body.light .csv-box {
+        background: #f9fafb;
+        border-color: #e5e7eb;
+      }
+      body.light .csv-textarea {
+        background: #ffffff;
+        color: #111827;
+        border-color: #e5e7eb;
+      }
+      @media (max-width: 640px) {
+        .container {
+          padding: 16px;
+        }
+        .header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+        .control-row {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="title">抖音直播弹幕抓取面板</div>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <button id="themeToggleBtn" class="btn btn-ghost">
+            切换白天/黑夜
+          </button>
+          <div class="status" id="statusText">
+            <span class="status-dot" id="statusDot"></span>
+            等待输入直播间 live_id
+          </div>
+        </div>
+      </div>
+
+      <div class="control-row">
+        <input
+          id="liveIdInput"
+          class="input"
+          placeholder="请输入直播间 live_id，例如：261378947940，然后按 Enter 或点击"开始抓取""
+        />
+        <button id="startBtn" class="btn btn-primary">开始抓取</button>
+        <button id="stopBtn" class="btn btn-secondary" disabled>停止抓取</button>
+        <button id="clearBtn" class="btn btn-secondary">清空弹幕</button>
+      </div>
+
+      <div class="hint">
+        - 按 <code>Enter</code> 相当于点击“开始抓取”<br />
+        - “清空弹幕”只清理当前前端显示，不会影响后端采集<br />
+        - 5~15秒后，前端会自动获取弹幕消息，无需手动刷新<br />
+        - 支持切换白天/黑夜模式<br />
+        - 支持下载CSV文件<br />
+        - 支持清空弹幕<br />
+      </div>
+
+      <div class="danmu-box">
+        <div class="danmu-header">
+          <div class="danmu-title">弹幕流</div>
+          <div class="danmu-counter">
+            共 <span id="danmuCount">0</span> 条
+          </div>
+        </div>
+        <div class="stats-row" id="statsRow">
+          <span class="stat-pill">聊天: <span id="statChat">0</span></span>
+          <span class="stat-pill">礼物: <span id="statGift">0</span></span>
+          <span class="stat-pill">点赞: <span id="statLike">0</span></span>
+          <span class="stat-pill">进场: <span id="statEnter">0</span></span>
+          <span class="stat-pill">关注: <span id="statFollow">0</span></span>
+          <span class="stat-pill">统计: <span id="statStats">0</span></span>
+          <span class="stat-pill">直播间: <span id="statRoom">0</span></span>
+          <span class="stat-pill"
+            >表情: <span id="statEmoji">0</span></span
+          >
+        </div>
+        <div id="danmuList" class="danmu-list"></div>
+      </div>
+
+      <div class="csv-box">
+        <div class="csv-header">
+          <span>CSV 视图（timestamp,type,user_id,user_name,content）</span>
+          <button id="downloadCsvBtn" class="btn btn-secondary">
+            下载 CSV
+          </button>
+        </div>
+        <textarea
+          id="csvView"
+          class="csv-textarea"
+          readonly
+        ></textarea>
+      </div>
+
+      <div class="footer">
+        终端运行结果中的弹幕消息已实时映射到本页面显示。
+      </div>
+
+      <div class="disclaimer">
+        <strong>⚠️ 免责声明：</strong>本项目仅供学习交流使用，请勿用于商业或非法用途。所有数据来源于抖音公开数据，版权归原作者所有。使用本工具产生的任何法律风险由使用者自行承担。
+      </div>
+    </div>
+
+    <script>
+      const liveIdInput = document.getElementById("liveIdInput");
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const danmuList = document.getElementById("danmuList");
+      const danmuCount = document.getElementById("danmuCount");
+      const statusText = document.getElementById("statusText");
+      const statusDot = document.getElementById("statusDot");
+      const themeToggleBtn = document.getElementById("themeToggleBtn");
+      const csvView = document.getElementById("csvView");
+      const downloadCsvBtn = document.getElementById("downloadCsvBtn");
+
+      const statEls = {
+        chat: document.getElementById("statChat"),
+        gift: document.getElementById("statGift"),
+        like: document.getElementById("statLike"),
+        enter: document.getElementById("statEnter"),
+        follow: document.getElementById("statFollow"),
+        stats: document.getElementById("statStats"),
+        room: document.getElementById("statRoom"),
+        emoji: document.getElementById("statEmoji"),
+      };
+
+      let currentLiveId = "";
+      let pollingTimer = null;
+      let totalCount = 0;
+      let isRunning = false;
+      const stats = {
+        chat: 0,
+        gift: 0,
+        like: 0,
+        enter: 0,
+        follow: 0,
+        stats: 0,
+        room: 0,
+        emoji: 0,
+      };
+      const allMessages = [];
+
+      function setStatus(text, active) {
+        statusText.textContent = text;
+        statusText.prepend(statusDot);
+        statusDot.style.background = active ? "#22c55e" : "#f97316";
+      }
+
+      function appendDanmuItem(msg) {
+        const item = document.createElement("div");
+        item.className = "danmu-item";
+
+        const time = document.createElement("div");
+        time.className = "danmu-time";
+        time.textContent = msg.timestamp || "";
+
+        const type = document.createElement("div");
+        type.className = "danmu-type";
+        const typeLabelMap = {
+          chat: "聊天消息",
+          gift: "礼物消息",
+          like: "点赞消息",
+          enter: "进场消息",
+          follow: "关注消息",
+          stats: "统计消息",
+          room: "直播间消息",
+          emoji: "表情消息",
+          fansclub: "粉丝团消息",
+          room_stats: "直播统计消息",
+        };
+        type.textContent = typeLabelMap[msg.type] || msg.type || "其他";
+
+        const user = document.createElement("div");
+        user.className = "danmu-user";
+        user.textContent = msg.user_name || "未知用户";
+
+        const content = document.createElement("div");
+        content.className = "danmu-content";
+        content.textContent = msg.content || "";
+
+        item.appendChild(time);
+        item.appendChild(type);
+        item.appendChild(user);
+        item.appendChild(content);
+
+        danmuList.appendChild(item);
+        danmuList.scrollTop = danmuList.scrollHeight;
+
+        totalCount += 1;
+        danmuCount.textContent = totalCount;
+
+        // 统计计数
+        if (msg.type && stats.hasOwnProperty(msg.type)) {
+          stats[msg.type] += 1;
+          if (statEls[msg.type]) {
+            statEls[msg.type].textContent = stats[msg.type];
+          }
+        }
+
+        // 保存消息用于 CSV 导出
+        allMessages.push(msg);
+        updateCsvView();
+      }
+
+      function csvEscape(value) {
+        if (value == null) return "";
+        const str = String(value);
+        // 如果包含逗号、引号或换行，用双引号包裹并转义引号
+        if (/[",\n]/.test(str)) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      }
+
+      function updateCsvView() {
+        const header = "timestamp,type,user_id,user_name,content";
+        const lines = allMessages.map((m) =>
+          [
+            csvEscape(m.timestamp),
+            csvEscape(m.type),
+            csvEscape(m.user_id),
+            csvEscape(m.user_name),
+            csvEscape(m.content),
+          ].join(",")
+        );
+        csvView.value = [header, ...lines].join("\n");
+      }
+
+      function clearDanmu() {
+        danmuList.innerHTML = "";
+        totalCount = 0;
+        danmuCount.textContent = "0";
+        // 重置统计
+        Object.keys(stats).forEach((k) => {
+          stats[k] = 0;
+          if (statEls[k]) {
+            statEls[k].textContent = "0";
+          }
+        });
+        // 清空本地消息和 CSV 视图
+        allMessages.length = 0;
+        csvView.value = "";
+      }
+
+      async function startFetch() {
+        const liveId = liveIdInput.value.trim();
+        if (!liveId) {
+          alert("请先输入 live_id");
+          return;
+        }
+        currentLiveId = liveId;
+
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        isRunning = true;
+        setStatus(`正在连接直播间 ${liveId} ...`, true);
+
+        try {
+          const resp = await fetch("/api/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ live_id: liveId }),
+          });
+          const data = await resp.json();
+          if (!resp.ok || data.error) {
+            throw new Error(data.error || "后台启动失败");
+          }
+
+          setStatus(`直播间 ${liveId} 已连接，开始接收弹幕...`, true);
+
+          if (pollingTimer) clearInterval(pollingTimer);
+          pollingTimer = setInterval(pollComments, 1000);
+        } catch (e) {
+          console.error(e);
+          setStatus(`连接失败：${e.message}`, false);
+          alert("连接失败：" + e.message);
+          isRunning = false;
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+        }
+      }
+
+      async function stopFetch() {
+        if (!currentLiveId || !isRunning) {
+          return;
+        }
+
+        try {
+          const resp = await fetch("/api/stop", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ live_id: currentLiveId }),
+          });
+          
+          if (pollingTimer) {
+            clearInterval(pollingTimer);
+            pollingTimer = null;
+          }
+          
+          isRunning = false;
+          currentLiveId = "";
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          setStatus("已停止抓取", false);
+          
+          console.log("已停止抓取");
+        } catch (e) {
+          console.error("停止抓取失败", e);
+          setStatus(`停止失败：${e.message}`, false);
+          alert("停止失败：" + e.message);
+        }
+      }
+
+      async function pollComments() {
+        if (!currentLiveId) return;
+        try {
+          const resp = await fetch(
+            `/api/comments?live_id=${encodeURIComponent(currentLiveId)}`
+          );
+          const data = await resp.json();
+          if (!resp.ok || data.error) {
+            throw new Error(data.error || "获取弹幕失败");
+          }
+          const list = data.comments || [];
+          if (Array.isArray(list) && list.length > 0) {
+            list.forEach(appendDanmuItem);
+          }
+        } catch (e) {
+          console.error("轮询弹幕失败", e);
+          setStatus(`轮询弹幕失败：${e.message}`, false);
+        }
+      }
+
+      startBtn.addEventListener("click", () => {
+        startFetch();
+      });
+
+      clearBtn.addEventListener("click", () => {
+        clearDanmu();
+      });
+
+      stopBtn.addEventListener("click", () => {
+        stopFetch();
+      });
+
+      liveIdInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          startFetch();
+        }
+      });
+
+      // 主题切换：白天 / 黑夜
+      themeToggleBtn.addEventListener("click", () => {
+        document.body.classList.toggle("light");
+        const isLight = document.body.classList.contains("light");
+        themeToggleBtn.textContent = isLight ? "切换到黑夜模式" : "切换白天模式";
+      });
+
+      // 页面关闭前停止所有抓取
+      window.addEventListener("beforeunload", () => {
+        if (isRunning && currentLiveId) {
+          navigator.sendBeacon("/api/stop", JSON.stringify({ live_id: currentLiveId }));
+        }
+      });
+
+      downloadCsvBtn.addEventListener("click", () => {
+        if (!csvView.value) {
+          alert("当前没有可导出的数据");
+          return;
+        }
+        const blob = new Blob([csvView.value], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        a.href = url;
+        a.download = `douyin_live_messages_${ts}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      setStatus("等待输入直播间 live_id", false);
+    </script>
+  </body>
+  </html>

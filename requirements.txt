@@ -1,0 +1,7 @@
+Flask==3.0.3
+requests==2.32.4
+betterproto==2.0.0b6
+websocket-client==1.7.0
+PyExecJS==1.5.1
+mini_racer==0.12.4
+python==3.14
