@@ -193,10 +193,10 @@ Content-Type: application/json
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `PORT` | 5000 | Web 服务端口 |
-| `MAX_ACTIVE_ROOMS` | 30 | 最大同时活跃的直播间数量 |
+| `MAX_ACTIVE_ROOMS` | 50 | 最大同时活跃的直播间数量 |
 | `ROOM_IDLE_SECONDS` | 600 | 直播间无活动多少秒后自动停止（10 分钟） |
-| `STARTS_PER_MINUTE_PER_IP` | 10 | 每个 IP 每分钟最多启动次数 |
-| `MAX_IDS_PER_START` | 10 | 单次请求最多启动的直播间数量 |
+| `STARTS_PER_MINUTE_PER_IP` | 3 | 每个 IP 每分钟最多启动次数 |
+| `MAX_IDS_PER_START` | 2 | 单次请求最多启动的直播间数量 |
 
 **设置示例：**
 
