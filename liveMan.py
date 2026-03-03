@@ -119,15 +119,18 @@ class DouyinLiveWebFetcher:
             'User-Agent': self.user_agent
         }
 
-        # 用于在内存中保存弹幕/消息，方便前端轮询获取
+        # 用于在内存中保存弹幕/消息（环形缓冲区），方便多人同时按 cursor 拉取
         self._comments = []
         self._comments_lock = threading.Lock()
+        self._seq = 0
+        self._max_buffer = 5000
 
     def _append_comment(self, msg_type: str, user_id=None, user_name=None, content: str = "", extra: dict | None = None):
         """
         统一将各种类型的消息追加到内存列表中，供前端获取。
         """
         data = {
+            "id": 0,
             "type": msg_type,
             "user_id": str(user_id) if user_id is not None else "",
             "user_name": user_name or "",
@@ -137,7 +140,13 @@ class DouyinLiveWebFetcher:
         if extra:
             data["extra"] = extra
         with self._comments_lock:
+            self._seq += 1
+            data["id"] = self._seq
             self._comments.append(data)
+            if len(self._comments) > self._max_buffer:
+                # 丢弃最老的一段，避免内存无限增长
+                drop_n = max(1, len(self._comments) - self._max_buffer)
+                self._comments = self._comments[drop_n:]
     
     def start(self):
         # 在启动前先验证直播间号是否有效
@@ -393,20 +402,39 @@ class DouyinLiveWebFetcher:
         # print(f"【聊天消息】,[{user_id}],{user_name},:,{content}")
         self._append_comment("chat", user_id=user_id, user_name=user_name, content=content)
 
-    def get_comments(self, clear: bool = True, max_count: int = 1000):
+    def get_comments_since(self, cursor: int = 0, limit: int = 200):
         """
-        获取当前已缓存的弹幕列表
-        :param clear: 是否在获取后清空缓存（适合轮询场景）
-        :param max_count: 最多保留的消息条数，防止内存无限增长
+        按 cursor 增量获取消息（适合公网多人同时拉取，互不影响，不清空全局缓存）
+        :param cursor: 客户端上一次拿到的最大消息 id（没有则传 0）
+        :param limit: 单次最多返回条数
+        :return: (comments, next_cursor, dropped)
+                 dropped=True 表示 cursor 过老，老消息已被环形缓冲区丢弃
         """
+        if limit <= 0:
+            limit = 200
+        if limit > 1000:
+            limit = 1000
+        if cursor < 0:
+            cursor = 0
+
         with self._comments_lock:
-            comments = list(self._comments)
-            if clear:
-                self._comments = []
-            else:
-                if len(self._comments) > max_count:
-                    self._comments = self._comments[-max_count:]
-        return comments
+            if not self._comments:
+                return [], cursor, False
+
+            oldest_id = self._comments[0].get("id", 0)
+            newest_id = self._comments[-1].get("id", 0)
+            dropped = cursor < oldest_id - 1
+
+            # 找到第一个 id > cursor 的位置（线性扫描即可，buffer 不大）
+            out = []
+            for m in self._comments:
+                if m.get("id", 0) > cursor:
+                    out.append(m)
+                    if len(out) >= limit:
+                        break
+
+            next_cursor = out[-1]["id"] if out else min(max(cursor, oldest_id - 1), newest_id)
+            return out, next_cursor, dropped
     
     def _parseGiftMsg(self, payload):
         """礼物消息"""
