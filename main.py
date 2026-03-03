@@ -18,7 +18,7 @@ _room_last_access: dict[str, float] = {}
 MAX_ACTIVE_ROOMS = int(os.getenv("MAX_ACTIVE_ROOMS", "50"))
 ROOM_IDLE_SECONDS = int(os.getenv("ROOM_IDLE_SECONDS", "600"))  # 10分钟没人拉取就自动停止
 #STARTS_PER_MINUTE_PER_IP = int(os.getenv("STARTS_PER_MINUTE_PER_IP", "100"))#每个IP每分钟最多启动次数
-MAX_IDS_PER_START = int(os.getenv("MAX_IDS_PER_START", "3"))#单次请求最多启动的直播间数量
+#MAX_IDS_PER_START = int(os.getenv("MAX_IDS_PER_START", "10"))#单次请求最多启动的直播间数量
 
 _ip_start_log: dict[str, list[float]] = {}
 _rate_lock = threading.Lock()
@@ -118,8 +118,8 @@ def api_start():
     if not live_ids:
         return jsonify({"error": "未解析到有效的 live_id"}), 400
 
-    if len(live_ids) > MAX_IDS_PER_START:
-        return jsonify({"error": f"单次最多启动 {MAX_IDS_PER_START} 个直播间"}), 400
+    #if len(live_ids) > MAX_IDS_PER_START:
+    #   return jsonify({"error": f"单次最多启动 {MAX_IDS_PER_START} 个直播间"}), 400
 
     started: list[str] = []
     errors: dict[str, str] = {}
