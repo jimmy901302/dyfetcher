@@ -17,8 +17,8 @@ _room_last_access: dict[str, float] = {}
 # 公网保护参数（可通过环境变量覆盖）
 MAX_ACTIVE_ROOMS = int(os.getenv("MAX_ACTIVE_ROOMS", "50"))
 ROOM_IDLE_SECONDS = int(os.getenv("ROOM_IDLE_SECONDS", "600"))  # 10分钟没人拉取就自动停止
-STARTS_PER_MINUTE_PER_IP = int(os.getenv("STARTS_PER_MINUTE_PER_IP", "10"))#每个IP每分钟最多启动次数
-MAX_IDS_PER_START = int(os.getenv("MAX_IDS_PER_START", "10"))#单次请求最多启动的直播间数量
+#STARTS_PER_MINUTE_PER_IP = int(os.getenv("STARTS_PER_MINUTE_PER_IP", "100"))#每个IP每分钟最多启动次数
+MAX_IDS_PER_START = int(os.getenv("MAX_IDS_PER_START", "3"))#单次请求最多启动的直播间数量
 
 _ip_start_log: dict[str, list[float]] = {}
 _rate_lock = threading.Lock()
@@ -29,9 +29,6 @@ def _rate_limit_start(ip: str) -> bool:
     with _rate_lock:
         lst = _ip_start_log.get(ip, [])
         lst = [t for t in lst if now - t < 60]
-        if len(lst) >= STARTS_PER_MINUTE_PER_IP:
-            _ip_start_log[ip] = lst
-            return False
         lst.append(now)
         _ip_start_log[ip] = lst
         return True
