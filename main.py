@@ -3,7 +3,7 @@ import os
 import threading
 import time
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, render_template, request
 
 from liveMan import DouyinLiveWebFetcher
 
@@ -15,31 +15,20 @@ _rooms_lock = threading.Lock()
 _room_last_access: dict[str, float] = {}
 
 # 公网保护参数（可通过环境变量覆盖）
-# 单实例 2C/1G，目标 500 客户端 / 10 房间，这里默认更保守一些
-MAX_ACTIVE_ROOMS = int(os.getenv("MAX_ACTIVE_ROOMS", "10"))
+MAX_ACTIVE_ROOMS = int(os.getenv("MAX_ACTIVE_ROOMS", "50"))
 ROOM_IDLE_SECONDS = int(os.getenv("ROOM_IDLE_SECONDS", "600"))  # 10分钟没人拉取就自动停止
-STARTS_PER_MINUTE_PER_IP = int(os.getenv("STARTS_PER_MINUTE_PER_IP", "10"))  # 每个IP每分钟最多启动次数
-MAX_IDS_PER_START = int(os.getenv("MAX_IDS_PER_START", "1"))  # 单次请求最多启动的直播间数量
+#STARTS_PER_MINUTE_PER_IP = int(os.getenv("STARTS_PER_MINUTE_PER_IP", "100"))#每个IP每分钟最多启动次数
+#MAX_IDS_PER_START = int(os.getenv("MAX_IDS_PER_START", "10"))#单次请求最多启动的直播间数量
 
 _ip_start_log: dict[str, list[float]] = {}
 _rate_lock = threading.Lock()
 
 
 def _rate_limit_start(ip: str) -> bool:
-    """
-    简单的内存限流：统计最近 60 秒内该 IP 启动次数是否超过阈值。
-    注意：单实例下有效，如以后多实例部署建议改用 Redis 等共享存储。
-    """
     now = time.time()
     with _rate_lock:
         lst = _ip_start_log.get(ip, [])
-        # 只保留 60 秒内的记录
         lst = [t for t in lst if now - t < 60]
-        if len(lst) >= STARTS_PER_MINUTE_PER_IP:
-            # 超过阈值，拒绝本次请求
-            _ip_start_log[ip] = lst
-            return False
-
         lst.append(now)
         _ip_start_log[ip] = lst
         return True
@@ -100,14 +89,6 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/doc")
-def doc():
-    """直接返回本地 README.md 文件内容（原始 Markdown）"""
-    directory = os.path.dirname(__file__)
-    filename = "README.md"
-    return send_from_directory(directory, filename, mimetype="text/markdown; charset=utf-8")
-
-
 @app.route("/api/start", methods=["POST"])
 def api_start():
     """
@@ -137,8 +118,8 @@ def api_start():
     if not live_ids:
         return jsonify({"error": "未解析到有效的 live_id"}), 400
 
-    if len(live_ids) > MAX_IDS_PER_START:
-        return jsonify({"error": f"单次最多启动 {MAX_IDS_PER_START} 个直播间"}), 400
+    #if len(live_ids) > MAX_IDS_PER_START:
+    #   return jsonify({"error": f"单次最多启动 {MAX_IDS_PER_START} 个直播间"}), 400
 
     started: list[str] = []
     errors: dict[str, str] = {}
@@ -225,19 +206,8 @@ def api_stop():
     return jsonify({"status": "stopped"})
 
 
-
-# 【代码更改1】修改响应内容
-@app.route('/')
-def hello_railway():
-    return 'Hello Railway! （代码已修改）'
-
-# 【代码更改2】新增路由
-@app.route('/about')
-def about():
-    return 'About Page - Deployed on Railway'
-
-if __name__ == '__main__':
-    # 读取 Railway PORT 环境变量，本地默认 3000
-    port = int(os.environ.get('PORT', 3000))
-    # 绑定 0.0.0.0 让外部可访问
-    app.run(host='0.0.0.0', port=port)
+if __name__ == "__main__":
+    # 直接运行 main.py 即可启动后端 + 前端页面
+    port = int(os.getenv("PORT", "5000"))
+    threading.Thread(target=_cleanup_rooms_loop, daemon=True).start()
+    app.run(host="0.0.0.0", port=port, debug=False)
