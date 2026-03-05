@@ -358,6 +358,9 @@
       <div class="header">
         <div class="title">抖音直播弹幕抓取面板</div>
         <div style="display: flex; align-items: center; gap: 10px">
+          <button id="docBtn" class="btn btn-ghost">
+            使用文档
+          </button>
           <button id="themeToggleBtn" class="btn btn-ghost">
             切换白天/黑夜
           </button>
@@ -372,7 +375,7 @@
         <input
           id="liveIdInput"
           class="input"
-          placeholder="请输入直播间 live_id，例如：261378947940，然后按 Enter 或点击"开始抓取""
+          placeholder="请输入直播间 live_id，例如：261378947940，然后按 Enter 或点击「开始抓取」"
         />
         <button id="startBtn" class="btn btn-primary">开始抓取</button>
         <button id="stopBtn" class="btn btn-secondary" disabled>停止抓取</button>
@@ -387,7 +390,7 @@
         - 支持下载CSV文件<br />
         - 支持清空弹幕<br />
         - 10分钟没人拉取就自动停止<br />
-        - 单次请求最多启动3个直播间<br />
+        - 单次请求最多启动1个直播间(直播号用空格隔开)<br />
       </div>
 
       <div class="danmu-box">
@@ -447,6 +450,9 @@
         <div class="csv-header">
           <span>CSV 视图</span>
           <div style="display: flex; gap: 8px">
+            <button id="toggleCsvBtn" class="btn btn-ghost" style="padding:4px 8px;font-size:12px">
+              折叠
+            </button>
             <button id="copyCsvBtn" class="btn btn-secondary">
               复制 CSV
             </button>
@@ -467,11 +473,13 @@
       </div>
 
       <div class="disclaimer">
-        <strong>⚠️ 免责声明：</strong>本项目仅供学习交流使用，请勿用于商业或非法用途。所有数据来源于抖音公开数据。使用本工具产生的任何法律风险由使用者自行承担。
+        <strong>⚠️ ：</strong>所有数据来源于抖音公开数据。
       </div>
     </div>
-
-    <script>
+    <script>// app.js 完整代码
+      // === 配置后端 API 基址 ===
+      const API_BASE = "http://127.0.0.1:5000";
+      
       const liveIdInput = document.getElementById("liveIdInput");
       const startBtn = document.getElementById("startBtn");
       const stopBtn = document.getElementById("stopBtn");
@@ -481,11 +489,14 @@
       const statusText = document.getElementById("statusText");
       const statusDot = document.getElementById("statusDot");
       const themeToggleBtn = document.getElementById("themeToggleBtn");
+      const docBtn = document.getElementById("docBtn");
       const csvView = document.getElementById("csvView");
       const downloadCsvBtn = document.getElementById("downloadCsvBtn");
       const copyCsvBtn = document.getElementById("copyCsvBtn");
       const filterRow = document.getElementById("filterRow");
-
+      const toggleCsvBtn = document.getElementById("toggleCsvBtn");
+      const csvBox = document.querySelector(".csv-box");
+      
       const statEls = {
         chat: document.getElementById("statChat"),
         gift: document.getElementById("statGift"),
@@ -496,11 +507,13 @@
         room: document.getElementById("statRoom"),
         emoji: document.getElementById("statEmoji"),
       };
-
+      
       let currentLiveId = "";
       let pollingTimer = null;
       let cursor = 0;
       let isRunning = false;
+      const MAX_MESSAGES = 500;
+      const MAX_CSV_ROWS = 5000;
       const stats = {
         chat: 0,
         gift: 0,
@@ -512,6 +525,8 @@
         emoji: 0,
       };
       const allMessages = [];
+      let csvLines = [];
+      let csvUpdateScheduled = false;
       const typeFilters = {
         chat: true,
         gift: true,
@@ -522,21 +537,21 @@
         room: true,
         emoji: true,
       };
-
+      
       function setStatus(text, active) {
         statusText.textContent = text;
         statusText.prepend(statusDot);
         statusDot.style.background = active ? "#22c55e" : "#f97316";
       }
-
+      
       function createDanmuItem(msg) {
         const item = document.createElement("div");
         item.className = "danmu-item";
-
+      
         const time = document.createElement("div");
         time.className = "danmu-time";
         time.textContent = msg.timestamp || "";
-
+      
         const type = document.createElement("div");
         type.className = "danmu-type";
         const typeLabelMap = {
@@ -552,19 +567,19 @@
           room_stats: "直播统计消息",
         };
         type.textContent = typeLabelMap[msg.type] || msg.type || "其他";
-
+      
         const userId = document.createElement("div");
         userId.className = "danmu-user-id";
         userId.textContent = msg.user_id || "";
-
+      
         const user = document.createElement("div");
         user.className = "danmu-user";
         user.textContent = msg.user_name || "未知用户";
-
+      
         const content = document.createElement("div");
         content.className = "danmu-content";
         content.textContent = msg.content || "";
-
+      
         item.appendChild(time);
         item.appendChild(type);
         item.appendChild(userId);
@@ -572,99 +587,122 @@
         item.appendChild(content);
         return item;
       }
-
+      
       function renderAllMessages() {
         danmuList.innerHTML = "";
         let visibleCount = 0;
-        allMessages.forEach((m) => {
+        const fragment = document.createDocumentFragment();
+        const startIndex = Math.max(0, allMessages.length - MAX_MESSAGES);
+        for (let i = startIndex; i < allMessages.length; i++) {
+          const m = allMessages[i];
           const allowed = typeFilters[m.type] !== false;
-          if (!allowed) return;
+          if (!allowed) continue;
           const item = createDanmuItem(m);
-          danmuList.appendChild(item);
+          fragment.appendChild(item);
           visibleCount += 1;
-        });
+        }
+        danmuList.appendChild(fragment);
         danmuCount.textContent = visibleCount;
         danmuList.scrollTop = danmuList.scrollHeight;
       }
-
+      
       function csvEscape(value) {
         if (value == null) return "";
         const str = String(value);
-        // 如果包含逗号、引号或换行，用双引号包裹并转义引号
         if (/[",\n]/.test(str)) {
           return '"' + str.replace(/"/g, '""') + '"';
         }
         return str;
       }
-
-      function updateCsvView() {
-        const header = "timestamp,type,user_id,user_name,content";
-        const lines = allMessages.map((m) =>
-          [
-            csvEscape(m.timestamp),
-            csvEscape(m.type),
-            csvEscape(m.user_id),
-            csvEscape(m.user_name),
-            csvEscape(m.content),
-          ].join(",")
-        );
-        csvView.value = [header, ...lines].join("\n");
+      
+      function scheduleCsvUpdate() {
+        if (csvUpdateScheduled) return;
+        csvUpdateScheduled = true;
+        setTimeout(() => {
+          csvUpdateScheduled = false;
+          const header = "timestamp,type,user_id,user_name,content";
+          csvView.value = [header, ...csvLines].join("\n");
+        }, 200);
       }
-
+      
+      function appendMessageToDom(msg) {
+        const allowed = typeFilters[msg.type] !== false;
+        if (!allowed) return;
+        const item = createDanmuItem(msg);
+        danmuList.appendChild(item);
+        while (danmuList.children.length > MAX_MESSAGES) {
+          danmuList.removeChild(danmuList.firstChild);
+        }
+        danmuCount.textContent = danmuList.children.length;
+        danmuList.scrollTop = danmuList.scrollHeight;
+      }
+      
       function handleNewMessage(msg) {
-        // 统计计数（总量）
         if (msg.type && stats.hasOwnProperty(msg.type)) {
           stats[msg.type] += 1;
           if (statEls[msg.type]) {
             statEls[msg.type].textContent = stats[msg.type];
           }
         }
-
+      
         allMessages.push(msg);
-        updateCsvView();
-        renderAllMessages();
+        if (allMessages.length > MAX_MESSAGES * 2) {
+          allMessages.splice(0, allMessages.length - MAX_MESSAGES * 2);
+        }
+      
+        const line = [
+          csvEscape(msg.timestamp),
+          csvEscape(msg.type),
+          csvEscape(msg.user_id),
+          csvEscape(msg.user_name),
+          csvEscape(msg.content),
+        ].join(",");
+        csvLines.push(line);
+        if (csvLines.length > MAX_CSV_ROWS) {
+          csvLines.splice(0, csvLines.length - MAX_CSV_ROWS);
+        }
+        scheduleCsvUpdate();
+      
+        appendMessageToDom(msg);
       }
-
+      
       function clearDanmu() {
         danmuList.innerHTML = "";
-        // 重置统计
         Object.keys(stats).forEach((k) => {
           stats[k] = 0;
           if (statEls[k]) {
             statEls[k].textContent = "0";
           }
         });
-        // 清空本地消息和 CSV 视图
         allMessages.length = 0;
+        csvLines = [];
         csvView.value = "";
         cursor = 0;
         renderAllMessages();
       }
-
+      
       async function startFetch() {
         const raw = liveIdInput.value.trim();
         if (!raw) {
           alert("请先输入 live_id，可以输入一个或多个，用逗号分隔");
           return;
         }
-
-        // 支持多个直播间：用中英文逗号、分号或空格分隔
+      
         let txt = raw.replace(/；/g, ",").replace(/，/g, ",");
         txt = txt.replace(/;/g, ",");
         const ids = txt
           .split(/[,\s]+/)
           .map((s) => s.trim())
           .filter(Boolean);
-
+      
         if (ids.length === 0) {
           alert("未解析到有效的 live_id");
           return;
         }
-
-        // 当前页面只展示第一个房间的弹幕，其余房间在后台独立线程中运行
+      
         currentLiveId = ids[0];
         cursor = 0;
-
+      
         startBtn.disabled = true;
         stopBtn.disabled = false;
         isRunning = true;
@@ -674,9 +712,9 @@
             : `正在连接直播间 ${currentLiveId} ...`,
           true
         );
-
+      
         try {
-          const resp = await fetch("/api/start", {
+          const resp = await fetch(`${API_BASE}/api/start`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ live_id: ids }),
@@ -685,7 +723,7 @@
           if (!resp.ok || data.error) {
             throw new Error(data.error || data.detail || "后台启动失败");
           }
-
+      
           if (Array.isArray(data.started) && data.started.length > 0) {
             const okList = data.started.join(", ");
             setStatus(
@@ -697,7 +735,7 @@
           } else {
             setStatus("未能成功连接任何直播间", false);
           }
-
+      
           if (pollingTimer) clearInterval(pollingTimer);
           pollingTimer = setInterval(pollComments, 1000);
         } catch (e) {
@@ -709,14 +747,14 @@
           stopBtn.disabled = true;
         }
       }
-
+      
       async function stopFetch() {
         if (!currentLiveId || !isRunning) {
           return;
         }
-
+      
         try {
-          const resp = await fetch("/api/stop", {
+          const resp = await fetch(`${API_BASE}/api/stop`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ live_id: currentLiveId }),
@@ -741,14 +779,14 @@
           alert("停止失败：" + e.message);
         }
       }
-
+      
       async function pollComments() {
         if (!currentLiveId) return;
         try {
           const resp = await fetch(
-            `/api/comments?live_id=${encodeURIComponent(currentLiveId)}&cursor=${encodeURIComponent(
-              cursor
-            )}&limit=200`
+            `${API_BASE}/api/comments?live_id=${encodeURIComponent(
+              currentLiveId
+            )}&cursor=${encodeURIComponent(cursor)}&limit=200`
           );
           const data = await resp.json();
           if (!resp.ok || data.error) {
@@ -762,7 +800,6 @@
             if (!Number.isNaN(n)) cursor = n;
           }
           if (data.dropped) {
-            // cursor 太老，提示一次即可（不弹窗，避免打扰）
             console.warn("消息缓冲区已丢弃部分旧数据，建议提高拉取频率或减少房间数");
           }
           if (Array.isArray(list) && list.length > 0) {
@@ -773,45 +810,40 @@
           setStatus(`轮询弹幕失败：${e.message}`, false);
         }
       }
-
-      startBtn.addEventListener("click", () => {
-        startFetch();
-      });
-
-      clearBtn.addEventListener("click", () => {
-        clearDanmu();
-      });
-
-      stopBtn.addEventListener("click", () => {
-        stopFetch();
-      });
-
+      
+      // 事件绑定
+      startBtn.addEventListener("click", startFetch);
+      clearBtn.addEventListener("click", clearDanmu);
+      stopBtn.addEventListener("click", stopFetch);
       liveIdInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
+          e.preventDefault();
           startFetch();
         }
       });
-
-      // 主题切换：白天 / 黑夜
       themeToggleBtn.addEventListener("click", () => {
         document.body.classList.toggle("light");
         const isLight = document.body.classList.contains("light");
         themeToggleBtn.textContent = isLight ? "切换到黑夜模式" : "切换白天模式";
       });
-
-      // 页面关闭前停止所有抓取
+      docBtn.addEventListener("click", () => {
+        window.open(`${API_BASE}/doc`, "_blank");
+      });
       window.addEventListener("beforeunload", () => {
         if (isRunning && currentLiveId) {
-          navigator.sendBeacon("/api/stop", JSON.stringify({ live_id: currentLiveId }));
+          navigator.sendBeacon(
+            `${API_BASE}/api/stop`,
+            JSON.stringify({ live_id: currentLiveId })
+          );
         }
       });
-
       downloadCsvBtn.addEventListener("click", () => {
         if (!csvView.value) {
           alert("当前没有可导出的数据");
           return;
         }
-        const blob = new Blob([csvView.value], {
+        const csvContent = "\uFEFF" + csvView.value;
+        const blob = new Blob([csvContent], {
           type: "text/csv;charset=utf-8;",
         });
         const url = URL.createObjectURL(blob);
@@ -824,7 +856,10 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       });
-
+      toggleCsvBtn.addEventListener("click", () => {
+        const collapsed = csvBox.classList.toggle("collapsed");
+        toggleCsvBtn.textContent = collapsed ? "展开" : "折叠";
+      });
       copyCsvBtn.addEventListener("click", async () => {
         if (!csvView.value) {
           alert("当前没有可复制的数据");
@@ -838,8 +873,6 @@
           alert("复制失败，请手动选择文本复制");
         }
       });
-
-      // 类型筛选事件
       filterRow.addEventListener("change", (e) => {
         const target = e.target;
         if (target && target.matches('input[type="checkbox"][data-type]')) {
@@ -848,8 +881,8 @@
           renderAllMessages();
         }
       });
-
-      setStatus("等待输入直播间 live_id", false);
-    </script>
+      
+      // 初始化状态
+      setStatus("等待输入直播间 live_id", false);</script>
   </body>
   </html>
