@@ -225,8 +225,19 @@ def api_stop():
     return jsonify({"status": "stopped"})
 
 
-if __name__ == "__main__":
-    # 直接运行 main.py 即可启动后端 + 前端页面
-    port = int(os.getenv("PORT", "5000"))
-    threading.Thread(target=_cleanup_rooms_loop, daemon=True).start()
-    app.run(host="0.0.0.0", port=port, debug=False)
+
+# 【代码更改1】修改响应内容
+@app.route('/')
+def hello_railway():
+    return 'Hello Railway! （代码已修改）'
+
+# 【代码更改2】新增路由
+@app.route('/about')
+def about():
+    return 'About Page - Deployed on Railway'
+
+if __name__ == '__main__':
+    # 读取 Railway PORT 环境变量，本地默认 3000
+    port = int(os.environ.get('PORT', 3000))
+    # 绑定 0.0.0.0 让外部可访问
+    app.run(host='0.0.0.0', port=port)
