@@ -5,4 +5,4 @@ websocket-client==1.7.0
 PyExecJS==1.5.1
 mini_racer==0.12.4
 gunicorn==22.0.0
-py_mini_racer==1.6.0
+py_mini_racer==0.6.0
