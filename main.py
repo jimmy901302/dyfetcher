@@ -1,10 +1,10 @@
-
 import os
 import threading
 import time
 
 from flask import Flask, jsonify, render_template, request
 
+# 注意：请确保 liveMan.py 存在且 DouyinLiveWebFetcher 可正常导入
 from liveMan import DouyinLiveWebFetcher
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -17,18 +17,24 @@ _room_last_access: dict[str, float] = {}
 # 公网保护参数（可通过环境变量覆盖）
 MAX_ACTIVE_ROOMS = int(os.getenv("MAX_ACTIVE_ROOMS", "50"))
 ROOM_IDLE_SECONDS = int(os.getenv("ROOM_IDLE_SECONDS", "600"))  # 10分钟没人拉取就自动停止
-#STARTS_PER_MINUTE_PER_IP = int(os.getenv("STARTS_PER_MINUTE_PER_IP", "100"))#每个IP每分钟最多启动次数
-#MAX_IDS_PER_START = int(os.getenv("MAX_IDS_PER_START", "10"))#单次请求最多启动的直播间数量
+STARTS_PER_MINUTE_PER_IP = int(os.getenv("STARTS_PER_MINUTE_PER_IP", "100"))  # 修复：恢复限流常量
+MAX_IDS_PER_START = int(os.getenv("MAX_IDS_PER_START", "10"))  # 修复：恢复单次请求上限常量
 
 _ip_start_log: dict[str, list[float]] = {}
 _rate_lock = threading.Lock()
 
 
 def _rate_limit_start(ip: str) -> bool:
+    # 修复：补全限流逻辑，不再永远返回True
     now = time.time()
     with _rate_lock:
         lst = _ip_start_log.get(ip, [])
+        # 清理超过1分钟的记录
         lst = [t for t in lst if now - t < 60]
+        # 判断：超过每分钟启动上限则拦截
+        if len(lst) >= STARTS_PER_MINUTE_PER_IP:
+            return False
+        # 未超限则添加当前时间并放行
         lst.append(now)
         _ip_start_log[ip] = lst
         return True
@@ -118,8 +124,9 @@ def api_start():
     if not live_ids:
         return jsonify({"error": "未解析到有效的 live_id"}), 400
 
-    #if len(live_ids) > MAX_IDS_PER_START:
-    #   return jsonify({"error": f"单次最多启动 {MAX_IDS_PER_START} 个直播间"}), 400
+    # 修复：恢复单次请求数量限制
+    if len(live_ids) > MAX_IDS_PER_START:
+        return jsonify({"error": f"单次最多启动 {MAX_IDS_PER_START} 个直播间"}), 400
 
     started: list[str] = []
     errors: dict[str, str] = {}
@@ -146,8 +153,8 @@ def api_start():
     return jsonify({"status": "ok", "started": started, "errors": errors})
 
 
-@app.route("/api/comments", methods=["GET"]
-)
+# 修复：闭合括号，修正语法错误
+@app.route("/api/comments", methods=["GET"])
 def api_comments():
     """
     轮询获取某个直播间当前缓存的弹幕列表。
