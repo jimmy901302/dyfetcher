@@ -487,7 +487,8 @@
   </div>
 
   <script>
-    const API_BASE = "https://baojun.dpdns.org/";
+    // 使用同源后端，避免跨域/CORS 和外网不可达导致的 "Failed to fetch"
+    const API_BASE = "";
 
     const liveIdInput = document.getElementById("liveIdInput");
     const startBtn = document.getElementById("startBtn");

@@ -67,26 +67,35 @@ def _start_room_thread(live_id: str) -> DouyinLiveWebFetcher:
     为指定直播间启动一个抓取线程（如果还没有的话）。
     线程中调用 DouyinLiveWebFetcher.start()，内部会进行直播间号校验。
     """
+    # 第一次检查：若已存在则直接复用；同时校验活跃上限
     with _rooms_lock:
-        if len(_rooms) >= MAX_ACTIVE_ROOMS:
+        if len(_rooms) >= MAX_ACTIVE_ROOMS and live_id not in _rooms:
             raise ValueError(f"当前活跃房间数已达上限（{MAX_ACTIVE_ROOMS}），请稍后再试或减少房间数")
-        room = _rooms.get(live_id)
-        if room is not None:
-            return room
+        exists = _rooms.get(live_id)
+        if exists is not None:
+            return exists
 
-    room = DouyinLiveWebFetcher(live_id)
+    new_room = DouyinLiveWebFetcher(live_id)
 
     # 在 start() 之前先进行一次显式校验，尽早给前端错误信息
-    if not room.validate_live_id():
+    if not new_room.validate_live_id():
         raise ValueError(f"无效的直播间号：{live_id}，请检查直播间是否存在且正在直播")
 
-    t = threading.Thread(target=room.start, daemon=True)
+    # 双重检查：校验通过后，可能其他并发已插入；此处再确认一次
+    with _rooms_lock:
+        current = _rooms.get(live_id)
+        if current is not None:
+            return current
+        # 再次校验活跃上限（并发下可能已达上限）
+        if len(_rooms) >= MAX_ACTIVE_ROOMS:
+            raise ValueError(f"当前活跃房间数已达上限（{MAX_ACTIVE_ROOMS}），请稍后再试或减少房间数")
+        # 先放入字典，随后启动线程，避免并发重复创建
+        _rooms[live_id] = new_room
+
+    t = threading.Thread(target=new_room.start, daemon=True)
     t.start()
 
-    with _rooms_lock:
-        _rooms[live_id] = room
-
-    return room
+    return new_room
 
 
 @app.route("/")
@@ -106,7 +115,12 @@ def api_start():
     if not raw:
         return jsonify({"error": "缺少 live_id 参数"}), 400
 
-    client_ip = request.headers.get("CF-Connecting-IP") or request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown"
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        # 只取第一个（最左）IP
+        client_ip = xff.split(",")[0].strip()
+    else:
+        client_ip = request.headers.get("CF-Connecting-IP") or request.remote_addr or "unknown"
     if not _rate_limit_start(client_ip):
         return jsonify({"error": "启动过于频繁，请稍后再试"}), 429
 
