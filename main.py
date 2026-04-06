@@ -98,6 +98,20 @@ def _start_room_thread(live_id: str) -> DouyinLiveWebFetcher:
     return new_room
 
 
+@app.after_request
+def _add_no_cache_headers(resp):
+    # 对 API 响应禁用缓存，避免 CDN/反代缓存导致前端拿到旧数据
+    try:
+        p = request.path or ""
+        if p.startswith("/api/"):
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+    except Exception:
+        pass
+    return resp
+
+
 @app.route("/")
 def index():
     """前端页面"""
@@ -225,6 +239,37 @@ def api_stop():
             pass
 
     return jsonify({"status": "stopped"})
+
+
+@app.route("/api/room_stats", methods=["GET"])
+def api_room_stats():
+    """
+    诊断用：查看直播间缓冲与游标信息，帮助排查“已连接但无弹幕”的问题。
+    """
+    live_id = request.args.get("live_id")
+    if not live_id:
+        return jsonify({"error": "缺少 live_id 参数"}), 400
+
+    with _rooms_lock:
+        room = _rooms.get(live_id)
+    if not room:
+        return jsonify({"exists": False, "message": "房间未启动"})
+
+    # 读取内部缓冲的基本信息
+    try:
+        with room._comments_lock:  # noqa: SLF001  直接读取内部状态用于诊断
+            buf = room._comments
+            size = len(buf)
+            oldest_id = buf[0]["id"] if size else 0
+            newest_id = buf[-1]["id"] if size else 0
+        return jsonify({
+            "exists": True,
+            "buffer_size": size,
+            "oldest_id": oldest_id,
+            "newest_id": newest_id,
+        })
+    except Exception as e:
+        return jsonify({"exists": True, "error": f"读取缓冲失败：{e}"}), 500
 
 
 if __name__ == "__main__":

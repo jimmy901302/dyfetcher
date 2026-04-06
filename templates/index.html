@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>抖音直播弹幕抓取 🔴 实时弹幕抓取 💬 多类型消息支持</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="google-adsense-account" content="ca-pub-9461577395918976">
   <style>
     * {
       box-sizing: border-box;
@@ -38,6 +39,13 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 16px;
+      gap: 10px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
     }
     .title {
       font-size: 20px;
@@ -57,6 +65,7 @@
     }
     .control-row {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 12px;
     }
@@ -163,6 +172,7 @@
       align-items: center;
       gap: 8px;
       white-space: nowrap;
+      min-width: 0;
     }
     .danmu-time {
       font-size: 11px;
@@ -193,6 +203,7 @@
       flex: 1;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-width: 0;
     }
     .footer {
       margin-top: 10px;
@@ -362,20 +373,195 @@
       background: #d1d5db;
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 768px) {
+      body {
+        padding: 12px;
+      }
       .container {
-        padding: 16px;
+        padding: 14px;
+        border-radius: 12px;
+      }
+      .title {
+        font-size: 18px;
       }
       .header {
         flex-direction: column;
         align-items: flex-start;
-        gap: 4px;
+      }
+      .header-actions {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .status {
+        flex: 1;
+        min-width: 0;
+        word-break: break-all;
+      }
+      .control-row .input {
+        width: 100%;
+        flex: 1 1 100%;
+      }
+      .control-row .btn {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+      }
+      .danmu-box {
+        height: 55vh;
+        min-height: 260px;
+        max-height: 420px;
+      }
+      .csv-textarea {
+        height: 160px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding: 16px;
       }
       .control-row {
         flex-direction: column;
       }
+      .control-row .btn {
+        width: 100%;
+        flex: 1 1 100%;
+      }
       .danmu-box {
-        height: 300px;
+        height: 50vh;
+      }
+      .danmu-item {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        white-space: normal;
+        row-gap: 4px;
+      }
+      .danmu-time {
+        min-width: auto;
+      }
+      .danmu-user-id,
+      .danmu-user {
+        max-width: 42vw;
+      }
+      .danmu-content {
+        flex: 1 1 100%;
+        width: 100%;
+        overflow-wrap: anywhere;
+      }
+      .csv-header {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .csv-header > div {
+        width: 100%;
+        display: flex;
+      }
+      .csv-header > div .btn {
+        flex: 1 1 50%;
+      }
+    }
+
+    @media (max-width: 375px) {
+      body {
+        padding: 8px;
+      }
+      .container {
+        padding: 12px;
+        border-radius: 10px;
+      }
+      .title {
+        font-size: 16px;
+      }
+      .btn {
+        min-height: 40px;
+        padding: 9px 10px;
+        font-size: 13px;
+      }
+      .input {
+        font-size: 13px;
+        padding: 9px 10px;
+      }
+      .hint {
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      .stats-row {
+        gap: 6px;
+      }
+      .stat-pill {
+        font-size: 10px;
+        padding: 2px 6px;
+      }
+      .danmu-box {
+        min-height: 220px;
+      }
+      .danmu-item {
+        padding: 4px;
+        gap: 6px;
+      }
+      .danmu-time,
+      .danmu-type,
+      .danmu-user-id,
+      .danmu-user {
+        font-size: 10px;
+      }
+      .danmu-content {
+        font-size: 12px;
+      }
+      .csv-textarea {
+        height: 130px;
+        font-size: 10px;
+      }
+      .footer,
+      .disclaimer {
+        font-size: 10px;
+      }
+    }
+
+    @media (max-width: 932px) and (orientation: landscape) {
+      body {
+        padding: 8px;
+      }
+      .container {
+        max-width: 100%;
+        padding: 10px 12px;
+      }
+      .header {
+        margin-bottom: 8px;
+      }
+      .title {
+        font-size: 16px;
+      }
+      .status {
+        font-size: 12px;
+      }
+      .hint {
+        display: none;
+      }
+      .control-row {
+        margin-bottom: 8px;
+      }
+      .control-row .input {
+        flex: 1 1 38%;
+      }
+      .control-row .btn {
+        flex: 1 1 auto;
+        min-width: 90px;
+      }
+      .danmu-box {
+        height: 62vh;
+        min-height: 220px;
+      }
+      .csv-box {
+        margin-top: 8px;
+      }
+      .csv-textarea {
+        height: 110px;
+      }
+      .disclaimer {
+        margin-top: 10px;
+        padding: 8px;
       }
     }
   </style>
@@ -384,7 +570,7 @@
   <div class="container">
     <div class="header">
       <div class="title">抖音直播弹幕抓取面板</div>
-      <div style="display: flex; align-items: center; gap: 10px">
+      <div class="header-actions">
         <button id="themeToggleBtn" class="btn btn-ghost">
           切换白天/黑夜
         </button>
@@ -664,7 +850,7 @@
         });
         const d = await r.json();
         if (!r.ok || d.error) throw new Error(d.error || "启动失败");
-        setStatus(`已连接：${currentLiveId}`, true);
+        setStatus(`已连接：${currentLiveId}（等待弹幕...）`, true);
       } catch(e) {
         console.error(e);
         setStatus(`失败：${e.message}`, false);
@@ -676,18 +862,25 @@
       }
 
       if (pollingTimer) clearInterval(pollingTimer);
+      // 先立即拉一次，后续每秒轮询
+      await pollComments();
       pollingTimer = setInterval(pollComments, 1000);
     }
 
     async function pollComments() {
       if (!currentLiveId || !isRunning) return;
       try {
-        const r = await fetch(`${API_BASE}/api/comments?live_id=${encodeURIComponent(currentLiveId)}&cursor=${cursor}&limit=200`);
+        const r = await fetch(`${API_BASE}/api/comments?live_id=${encodeURIComponent(currentLiveId)}&cursor=${cursor}&limit=200&_ts=${Date.now()}`, {
+          headers: {"Accept":"application/json"}
+        });
         const d = await r.json();
         if (!r.ok || d.error) throw new Error(d.error);
         const list = d.comments || [];
         if (d.next_cursor != null) cursor = parseInt(d.next_cursor,10)||cursor;
-        if (Array.isArray(list) && list.length) list.forEach(handleNewMessage);
+        if (Array.isArray(list) && list.length) {
+          list.forEach(handleNewMessage);
+          setStatus(`已连接：${currentLiveId}（本轮新增 ${list.length} 条）`, true);
+        }
       } catch(e) { if (isRunning) setStatus(`轮询异常：${e.message}`, false); }
     }
 
